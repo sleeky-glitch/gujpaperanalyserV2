@@ -47,13 +47,13 @@ class NewspaperFinderBot:
                 if filename.endswith('.txt'):  # Process only .txt files
                     file_path = data_dir / filename
                     with open(file_path, 'r', encoding='utf-8') as file:
-                        content = file.read()
+                        content = file.read().strip()  # Read and strip whitespace
                         total_articles += 1
 
                         # Create a structured document for each text file
-                        doc_text = f"Content: {content}\nSource: {filename}"
+                        doc_text = content
                         metadata = {
-                            'source': filename
+                            'source': filename  # Use the filename as the source
                         }
                         documents.append(Document(text=doc_text, metadata=metadata))
 
@@ -86,14 +86,10 @@ class NewspaperFinderBot:
             results = []
             for node in response.source_nodes:
                 # Extract article information from node
-                text_chunks = node.text.split('\n')
-                article = {}
-
-                for chunk in text_chunks:
-                    if ': ' in chunk:
-                        key, value = chunk.split(': ', 1)
-                        article[key.lower()] = value
-
+                article = {
+                    'content': node.text,  # Full content of the article
+                    'source': node.node.metadata.get('source', 'Unknown Source')  # Metadata for source
+                }
                 results.append(article)
 
             logging.info(f"Found {len(results)} relevant articles for query: {query}")
@@ -161,8 +157,7 @@ def main():
                     with st.expander(f"{i}. {article.get('source', 'No source')}"):
                         st.write("**Content:**")
                         st.write(article.get('content', 'No content'))
-                        if 'source' in article:
-                            st.write(f"**Source:** {article['source']}")
+                        st.write(f"**Source:** {article.get('source', 'No source')}")
             else:
                 st.warning("No relevant articles found.")
         else:
