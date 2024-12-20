@@ -4,15 +4,14 @@ import os
 from pathlib import Path
 from typing import List, Dict
 import logging
-from llama_index import (
-    SimpleDirectoryReader,
+from llama_index.core import (
     VectorStoreIndex,
     ServiceContext,
-    Document,
-    OpenAIEmbedding
+    Document
 )
-from llama_index.llms import OpenAI
-from llama_index.node_parser import SimpleNodeParser
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.llms.openai import OpenAI
+from llama_index.core.node_parser import SimpleNodeParser
 
 class NewspaperFinderBot:
     def __init__(self):
