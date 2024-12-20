@@ -1,3 +1,2 @@
 streamlit
-fuzzywuzzy
-python-Levenshtein
+googletrans==3.1.0a0
