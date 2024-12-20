@@ -6,8 +6,8 @@ from typing import List, Dict
 import logging
 from llama_index.core import (
     VectorStoreIndex,
-    ServiceContext,
-    Document
+    Document,
+    Settings
 )
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
@@ -15,14 +15,15 @@ from llama_index.core.node_parser import SimpleNodeParser
 
 class NewspaperFinderBot:
     def __init__(self):
-        # Initialize OpenAI
+        # Initialize OpenAI components
         self.llm = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.embed_model = OpenAIEmbedding(api_key=st.secrets["OPENAI_API_KEY"])
-        self.service_context = ServiceContext.from_defaults(
-            llm=self.llm,
-            embed_model=self.embed_model,
-            chunk_size=512
-        )
+
+        # Configure global settings
+        Settings.llm = self.llm
+        Settings.embed_model = self.embed_model
+        Settings.chunk_size = 512
+
         self.setup_logging()
 
     def setup_logging(self):
@@ -69,7 +70,7 @@ class NewspaperFinderBot:
             # Create index from documents
             parser = SimpleNodeParser.from_defaults()
             nodes = parser.get_nodes_from_documents(documents)
-            index = VectorStoreIndex(nodes, service_context=self.service_context)
+            index = VectorStoreIndex(nodes)
 
             logging.info(f"Successfully indexed {total_articles} articles")
             return index, total_articles
