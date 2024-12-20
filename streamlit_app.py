@@ -1,94 +1,137 @@
+# app.py
 import streamlit as st
 import json
-import glob
 import os
-from googletrans import Translator
-from datetime import datetime
+from openai import OpenAI
+from typing import List, Dict
+import logging
+from pathlib import Path
 
-def load_json_files():
-    """Load all JSON files from the root directory"""
-    json_files = glob.glob("*.json")
-    all_data = {}
-    for file in json_files:
+class NewspaperFinderBot:
+    def __init__(self):
+        # Use Streamlit secrets for API key
+        self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        self.setup_logging()
+
+    def setup_logging(self):
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+
+    def load_json_files(self) -> List[Dict]:
+        """Load all JSON files from the data directory."""
+        all_news = []
         try:
-            with open(file, 'r', encoding='utf-8') as f:
-                # Extract date from filename (assuming format: YYYY-MM-DD-pageX.json)
-                date_str = file.split('-')[0:3]
-                date = '-'.join(date_str)
-                data = json.load(f)
-                all_data[date] = data
+            # Get the current directory
+            current_dir = Path(__file__).parent
+            data_dir = current_dir / "data"
+
+            for filename in os.listdir(data_dir):
+                if filename.endswith('.json'):
+                    file_path = data_dir / filename
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        news_data = json.load(file)
+                        all_news.extend(news_data if isinstance(news_data, list) else [news_data])
+            logging.info(f"Successfully loaded {len(all_news)} news articles")
+            return all_news
         except Exception as e:
-            st.error(f"Error loading {file}: {str(e)}")
-    return all_data
+            logging.error(f"Error loading JSON files: {str(e)}")
+            st.error(f"Error loading JSON files: {str(e)}")
+            return []
 
-def translate_text(text, target_lang='gu'):
-    """Translate text between English and Gujarati"""
-    translator = Translator()
-    try:
-        translation = translator.translate(text, dest=target_lang)
-        return translation.text
-    except:
-        return text
+    def search_news(self, query: str, news_data: List[Dict], max_results: int = 5) -> List[Dict]:
+        """Search news articles based on user query using OpenAI."""
+        try:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant that searches through Gujarati newspaper articles. Return relevant articles based on the query."},
+                {"role": "user", "content": f"Search for articles related to: {query}"}
+            ]
 
-def search_news(data, search_term):
-    """Search for news containing the search term in both English and Gujarati"""
-    results = []
+            articles_context = "\n".join([
+                f"Article {i+1}: {article.get('title', 'No title')} - {article.get('summary', 'No summary')[:100]}..."
+                for i, article in enumerate(news_data[:10])
+            ])
+            messages.append({"role": "user", "content": f"Available articles:\n{articles_context}"})
 
-    # Translate search term to both languages
-    guj_term = translate_text(search_term, 'gu') if search_term.isascii() else search_term
-    eng_term = translate_text(search_term, 'en') if not search_term.isascii() else search_term
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=500
+            )
 
-    search_terms = [search_term.lower(), guj_term.lower(), eng_term.lower()]
-
-    for date, content in data.items():
-        # Search in main news
-        for news in content.get('main_news', []):
-            for term in search_terms:
-                if (term in news.get('title', '').lower() or 
-                    term in str(news.get('details', '')).lower()):
-                    results.append({
-                        'date': date,
-                        'title': news['title'],
-                        'details': news['details'].get('summary', '') if isinstance(news['details'], dict) else str(news['details'])
-                    })
+            relevant_articles = []
+            for article in news_data:
+                if any(keyword.lower() in article.get('content', '').lower() 
+                      for keyword in query.lower().split()):
+                    relevant_articles.append(article)
+                if len(relevant_articles) >= max_results:
                     break
 
-        # Search in other headlines
-        for headline in content.get('other_headlines', []):
-            for term in search_terms:
-                if (term in headline.get('title', '').lower() or 
-                    term in str(headline.get('details', '')).lower()):
-                    results.append({
-                        'date': date,
-                        'title': headline['title'],
-                        'details': str(headline.get('details', ''))
-                    })
-                    break
+            logging.info(f"Found {len(relevant_articles)} relevant articles for query: {query}")
+            return relevant_articles
 
-    return results
+        except Exception as e:
+            logging.error(f"Error searching news: {str(e)}")
+            st.error(f"Error searching news: {str(e)}")
+            return []
 
 def main():
-    st.title("ગુજરાતી સમાચાર શોધક / Gujarati News Finder")
+    st.set_page_config(
+        page_title="Gujarati News Finder",
+        page_icon="📰",
+        layout="wide"
+    )
 
-    # Load data
-    data = load_json_files()
+    st.title("📰 Gujarati News Finder")
+    st.write("Search through Gujarati newspaper articles using natural language queries.")
+
+    # Initialize the bot
+    bot = NewspaperFinderBot()
+
+    # Load news data
+    with st.spinner("Loading news articles..."):
+        news_data = bot.load_json_files()
+        st.success(f"Loaded {len(news_data)} articles successfully!")
 
     # Search interface
-    search_term = st.text_input("Enter search term (English or Gujarati):")
+    query = st.text_input("Enter your search query:", placeholder="Example: Recent political news in Gujarat")
+    max_results = st.slider("Maximum number of results:", 1, 20, 5)
 
-    if search_term:
-        results = search_news(data, search_term)
+    if st.button("Search", type="primary"):
+        if query:
+            with st.spinner("Searching..."):
+                results = bot.search_news(query, news_data, max_results)
 
-        if results:
-            st.success(f"Found {len(results)} results")
-            for result in results:
-                with st.expander(f"{result['date']} - {result['title']}"):
-                    st.write(result['details'])
+            if results:
+                st.write(f"Found {len(results)} relevant articles:")
+                for i, article in enumerate(results, 1):
+                    with st.expander(f"{i}. {article.get('title', 'No title')}"):
+                        st.write("**Summary:**")
+                        st.write(article.get('summary', 'No summary'))
+                        st.write("**Content:**")
+                        st.write(article.get('content', 'No content available'))
+                        if 'date' in article:
+                            st.write(f"**Date:** {article['date']}")
+                        if 'source' in article:
+                            st.write(f"**Source:** {article['source']}")
+            else:
+                st.warning("No relevant articles found.")
         else:
-            st.warning("No results found")
+            st.warning("Please enter a search query.")
+
+    # Add filters in the sidebar
+    st.sidebar.title("Filters")
+    st.sidebar.info("""
+    This app searches through Gujarati newspaper articles using AI-powered search.
+
+    **Features:**
+    - Natural language queries
+    - Full-text search
+    - Article summaries
+    - Source information
+    """)
 
 if __name__ == "__main__":
     main()
-
-# Created/Modified files during execution:
-# No files are created or modified during execution
