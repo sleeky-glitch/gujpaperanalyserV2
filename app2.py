@@ -1,14 +1,15 @@
 import streamlit as st
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 import os
 
 def translate_to_gujarati(word):
-    translator = Translator()
     try:
-        translation = translator.translate(word, dest='gu')
-        return translation.text
-    except:
-        return "Translation failed"
+        translator = GoogleTranslator(source='en', target='gu')
+        translation = translator.translate(word)
+        return translation
+    except Exception as e:
+        st.error(f"Translation error: {str(e)}")
+        return None
 
 def search_in_file(translated_word, file_path):
     try:
@@ -37,23 +38,25 @@ def main():
     if search_word:
         # Translate word to Gujarati
         gujarati_word = translate_to_gujarati(search_word)
-        st.write(f"Translated word: {gujarati_word}")
 
-        # Specify the path to your text file
-        file_path = "data/your_text_file.txt"  # Update this path
+        if gujarati_word:
+            st.write(f"Translated word: {gujarati_word}")
 
-        # Search for the translated word
-        if st.button("Search"):
-            results = search_in_file(gujarati_word, file_path)
+            # Specify the path to your text file
+            file_path = "data/your_text_file.txt"  # Update this path
 
-            if results:
-                st.subheader("Found News Articles:")
-                for idx, article in enumerate(results, 1):
-                    st.write(f"Article {idx}:")
-                    st.write(article)
-                    st.markdown("---")
-            else:
-                st.warning("No articles found containing this word.")
+            # Search for the translated word
+            if st.button("Search"):
+                results = search_in_file(gujarati_word, file_path)
+
+                if results:
+                    st.subheader("Found News Articles:")
+                    for idx, article in enumerate(results, 1):
+                        st.write(f"Article {idx}:")
+                        st.write(article)
+                        st.markdown("---")
+                else:
+                    st.warning("No articles found containing this word.")
 
 if __name__ == "__main__":
     main()
