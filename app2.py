@@ -36,7 +36,7 @@ def search_in_files(translated_word):
             with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
                 # Split content into news articles
-                articles = content.split('\n\n')  # Adjust separator based on your file format
+                articles = content.split('\n')  # Adjust separator based on your file format
 
                 # Find matching articles
                 for article in articles:
