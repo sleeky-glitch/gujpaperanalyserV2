@@ -1,8 +1,6 @@
 import streamlit as st
-import json
 import os
 from pathlib import Path
-from typing import List, Dict
 import logging
 from llama_index.core import (
     VectorStoreIndex,
@@ -12,6 +10,7 @@ from llama_index.core import (
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.core.node_parser import SimpleNodeParser
+
 
 class NewspaperFinderBot:
     def __init__(self):
@@ -35,7 +34,7 @@ class NewspaperFinderBot:
     @staticmethod
     @st.cache_resource
     def load_and_index_articles():
-        """Load JSON files and create a searchable index."""
+        """Load text files and create a searchable index."""
         try:
             # Get the current directory
             current_dir = Path(__file__).parent
@@ -45,28 +44,18 @@ class NewspaperFinderBot:
             total_articles = 0
 
             for filename in os.listdir(data_dir):
-                if filename.endswith('.json'):
+                if filename.endswith('.txt'):  # Process only .txt files
                     file_path = data_dir / filename
                     with open(file_path, 'r', encoding='utf-8') as file:
-                        news_data = json.load(file)
-                        articles = news_data if isinstance(news_data, list) else [news_data]
-                        total_articles += len(articles)
+                        content = file.read()
+                        total_articles += 1
 
-                        for article in articles:
-                            # Create a structured document for each article
-                            doc_text = (
-                                f"Title: {article.get('title', 'No title')}\n"
-                                f"Summary: {article.get('summary', 'No summary')}\n"
-                                f"Content: {article.get('content', 'No content')}\n"
-                                f"Date: {article.get('date', 'No date')}\n"
-                                f"Source: {article.get('source', 'No source')}"
-                            )
-                            metadata = {
-                                'title': article.get('title', 'No title'),
-                                'date': article.get('date', 'No date'),
-                                'source': article.get('source', 'No source')
-                            }
-                            documents.append(Document(text=doc_text, metadata=metadata))
+                        # Create a structured document for each text file
+                        doc_text = f"Content: {content}\nSource: {filename}"
+                        metadata = {
+                            'source': filename
+                        }
+                        documents.append(Document(text=doc_text, metadata=metadata))
 
             # Create index from documents
             parser = SimpleNodeParser.from_defaults()
@@ -114,6 +103,7 @@ class NewspaperFinderBot:
             logging.error(f"Error searching news: {str(e)}")
             st.error(f"Error searching news: {str(e)}")
             return []
+
 
 def main():
     st.set_page_config(
@@ -168,13 +158,9 @@ def main():
             if results:
                 st.write(f"Found {len(results)} relevant articles:")
                 for i, article in enumerate(results, 1):
-                    with st.expander(f"{i}. {article.get('title', 'No title')}"):
-                        st.write("**Summary:**")
-                        st.write(article.get('summary', 'No summary'))
+                    with st.expander(f"{i}. {article.get('source', 'No source')}"):
                         st.write("**Content:**")
                         st.write(article.get('content', 'No content'))
-                        if 'date' in article:
-                            st.write(f"**Date:** {article['date']}")
                         if 'source' in article:
                             st.write(f"**Source:** {article['source']}")
             else:
@@ -193,6 +179,7 @@ def main():
     - Full-text search
     - Article summaries
     """)
+
 
 if __name__ == "__main__":
     main()
