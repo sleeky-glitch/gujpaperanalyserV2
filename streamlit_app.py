@@ -15,11 +15,11 @@ from llama_index.core.node_parser import SimpleNodeParser
 
 class NewspaperFinderBot:
     def __init__(self):
-        # Initialize OpenAI components
+        # Initialize OpenAI
         self.llm = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         self.embed_model = OpenAIEmbedding(api_key=st.secrets["OPENAI_API_KEY"])
 
-        # Configure global settings
+        # Configure settings
         Settings.llm = self.llm
         Settings.embed_model = self.embed_model
         Settings.chunk_size = 512
@@ -32,8 +32,9 @@ class NewspaperFinderBot:
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
 
+    @staticmethod
     @st.cache_resource
-    def load_and_index_articles(self):
+    def load_and_index_articles():
         """Load JSON files and create a searchable index."""
         try:
             # Get the current directory
@@ -129,7 +130,7 @@ def main():
 
     # Load and index news data
     with st.spinner("Loading and indexing articles..."):
-        index, total_articles = bot.load_and_index_articles()
+        index, total_articles = NewspaperFinderBot.load_and_index_articles()
         if index:
             st.success(f"Loaded and indexed {total_articles} articles successfully!")
         else:
