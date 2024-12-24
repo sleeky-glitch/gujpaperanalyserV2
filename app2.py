@@ -32,7 +32,7 @@ def search_in_files(search_word):
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
-                articles = content.split('\n')
+                articles = content.split('//')
 
                 for article in articles:
                     if search_word.lower() in article.lower():
